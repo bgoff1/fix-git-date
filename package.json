@@ -1,6 +1,6 @@
 {
 	"name": "@bgoff1/fix-git-date",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Updates latest git committer date and git author date.",
 	"keywords": ["git", "commitdate", "authordate"],
 	"homepage": "https://github.com/bgoff1/fix-git-date",
@@ -18,7 +18,9 @@
 		"url": "https://github.com/bgoff1"
 	},
 	"main": "dist/index.js",
-	"bin": "./dist/index.js",
+	"bin": {
+		"fix-git-date": "dist/index.js"
+	},
 	"scripts": {
 		"build": "tsc -p .",
 		"start": "node dist/index.js"

@@ -1,6 +1,6 @@
-src/**
+.github/**
 node_modules
-.vscode
+src/**
 tsconfig.json
 pnpm-lock.yaml
 .gitignore
