@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { parseArgs, promisify } from "node:util";
 import type { ParseArgsConfig } from "node:util";
 import { exec as childExec } from "node:child_process";
