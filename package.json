@@ -1,6 +1,6 @@
 {
 	"name": "@bgoff1/fix-git-date",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Updates latest git committer date and git author date.",
 	"keywords": ["git", "commitdate", "authordate"],
 	"homepage": "https://github.com/bgoff1/fix-git-date",

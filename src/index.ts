@@ -2,15 +2,7 @@
 
 import { parseArgs, promisify } from "node:util";
 import { exec as childExec } from "node:child_process";
-import {
-	addHours,
-	addDays,
-	addMilliseconds,
-	addMinutes,
-	addMonths,
-	addSeconds,
-	addWeeks,
-} from "date-fns";
+import { add, sub } from "date-fns";
 import { z } from "zod";
 
 const exec = promisify(childExec);
@@ -24,11 +16,54 @@ const COMMANDS = {
 const REGEX = {
 	AUTHOR_DATE: new RegExp(/AuthorDate: (.*)\n/),
 	COMMIT_HASH: new RegExp(/^commit ([a-zA-Z0-9]+)/),
-	IN_X_TIME: new RegExp(/in (\d+) (hour|day)s?/),
+	IN_X_TIME: new RegExp(/in (\d+) (second|minute|hour|day|week|month)s?/),
+	X_TIME_AGO: new RegExp(/(\d+) (second|minute|hour|day|week|month)s?/),
 } as const;
+
+const AmountSchema = z.number({ coerce: true });
+const TimeTypeSchema = z.enum([
+	"second",
+	"minute",
+	"hour",
+	"day",
+	"week",
+	"month",
+]);
+
+type TimeType = z.infer<typeof TimeTypeSchema>;
 
 const getRegexValue = (regex: RegExp, string: string) =>
 	regex.exec(string)?.[1];
+
+const handleSpecificFormats = (input: string) => {
+	const inTime = REGEX.IN_X_TIME.exec(input);
+	const timeAgo = REGEX.X_TIME_AGO.exec(input);
+
+	if (!inTime && !timeAgo) {
+		return input;
+	}
+
+	const amountString = (inTime || timeAgo)[1];
+	const timeTypeString = (inTime || timeAgo)[2];
+
+	const { success: amountSuccess, data: amount } =
+		AmountSchema.safeParse(amountString);
+	const { success: timeTypeSuccess, data: timeType } =
+		TimeTypeSchema.safeParse(timeTypeString);
+
+	if (!amountSuccess || !timeTypeSuccess) {
+		console.error("Invalid date string");
+		process.exit(1);
+	}
+
+	const interval: `${TimeType}s` = `${timeType}s`;
+
+	const modifyFn = inTime !== null ? add : sub;
+
+	const newTime = modifyFn(new Date(), { [interval]: amount });
+
+	return newTime.toLocaleString();
+};
 
 const getUserDate = () => {
 	const { values } = parseArgs({
@@ -45,43 +80,7 @@ const getUserDate = () => {
 		return process.exit(1);
 	}
 
-	const inTime = REGEX.IN_X_TIME.exec(values.date);
-
-	if (inTime) {
-		const amount = z.number({ coerce: true }).safeParse(inTime[1]);
-		const TimeTypeSchema = z.enum([
-			"millisecond",
-			"second",
-			"minute",
-			"hour",
-			"day",
-			"week",
-			"month",
-		]);
-		const timeType = TimeTypeSchema.safeParse(inTime[2]);
-
-		if (!amount.success || !timeType.success) {
-			console.error("Invalid date string");
-			process.exit(1);
-		}
-
-		const addFns: Record<
-			z.infer<typeof TimeTypeSchema>,
-			(date: Date, amount: number) => Date
-		> = {
-			millisecond: addMilliseconds,
-			second: addSeconds,
-			minute: addMinutes,
-			hour: addHours,
-			day: addDays,
-			week: addWeeks,
-			month: addMonths,
-		};
-
-		return addFns[timeType.data](new Date(), amount.data).toLocaleString();
-	}
-
-	return values.date;
+	return handleSpecificFormats(values.date);
 };
 
 const execute = async (command: string, env: Record<string, string> = {}) => {
