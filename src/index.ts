@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 
 import { parseArgs, promisify } from "node:util";
-import type { ParseArgsConfig } from "node:util";
 import { exec as childExec } from "node:child_process";
+import {
+	addHours,
+	addDays,
+	addMilliseconds,
+	addMinutes,
+	addMonths,
+	addSeconds,
+	addWeeks,
+} from "date-fns";
+import { z } from "zod";
 
 const exec = promisify(childExec);
-
-const PARSE_ARGS_OPTS: ParseArgsConfig["options"] = {
-	date: {
-		type: "string",
-		default: undefined,
-	},
-};
 
 const COMMANDS = {
 	GET_LAST_COMMIT: "git log -n 1 --format=fuller",
@@ -22,22 +24,64 @@ const COMMANDS = {
 const REGEX = {
 	AUTHOR_DATE: new RegExp(/AuthorDate: (.*)\n/),
 	COMMIT_HASH: new RegExp(/^commit ([a-zA-Z0-9]+)/),
+	IN_X_TIME: new RegExp(/in (\d+) (hour|day)s?/),
 } as const;
 
 const getRegexValue = (regex: RegExp, string: string) =>
 	regex.exec(string)?.[1];
 
 const getUserDate = () => {
-	const { values } = parseArgs({ options: PARSE_ARGS_OPTS });
+	const { values } = parseArgs({
+		options: {
+			date: {
+				type: "string",
+				default: undefined,
+			},
+		},
+	});
 
-	const date = values.date as string;
-
-	if (!date) {
+	if (!values.date) {
 		console.error("Missing date!");
 		return process.exit(1);
 	}
 
-	return date;
+	const inTime = REGEX.IN_X_TIME.exec(values.date);
+
+	if (inTime) {
+		const amount = z.number({ coerce: true }).safeParse(inTime[1]);
+		const TimeTypeSchema = z.enum([
+			"millisecond",
+			"second",
+			"minute",
+			"hour",
+			"day",
+			"week",
+			"month",
+		]);
+		const timeType = TimeTypeSchema.safeParse(inTime[2]);
+
+		if (!amount.success || !timeType.success) {
+			console.error("Invalid date string");
+			process.exit(1);
+		}
+
+		const addFns: Record<
+			z.infer<typeof TimeTypeSchema>,
+			(date: Date, amount: number) => Date
+		> = {
+			millisecond: addMilliseconds,
+			second: addSeconds,
+			minute: addMinutes,
+			hour: addHours,
+			day: addDays,
+			week: addWeeks,
+			month: addMonths,
+		};
+
+		return addFns[timeType.data](new Date(), amount.data).toLocaleString();
+	}
+
+	return values.date;
 };
 
 const execute = async (command: string, env: Record<string, string> = {}) => {
